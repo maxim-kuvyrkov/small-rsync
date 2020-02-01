@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -euf -o pipefail
 
 lock=/mnt/btrfs/.backup-inprogress
 
