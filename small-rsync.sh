@@ -6,6 +6,11 @@ scripts=$(cd $(dirname "$0") && pwd)
 
 backup_dir="${1-/mnt/btrfs}"
 
+# Subdirectory relative to $backup_dir to backup.
+# Mostly for testing on a subset of filesystem.
+#subdir="/home/maxim/bin/"
+subdir="/"
+
 tmp_dir="$backup_dir/.backup"
 
 mkdir -p "$tmp_dir"
@@ -87,28 +92,25 @@ $rsh2 dir825 chmod +x /opt/bin/myrsync
 
 date > "$tmp_dir"/started
 
-#dir="/home/maxim/bin/"
-dir="/"
-
 if $cleanup; then
-    $rsh2 dir825 "cd /mmc$dir; find -type d -print0" \
+    $rsh2 dir825 "cd /mmc$subdir; find -type d -print0" \
 	| xargs -0 -i@ "$scripts/small-rsync-filter.sh" "@" \
 	| parallel --recend '\0' -0 --pipe -j1 -u --block 1M \
 		   rsync --delete --delete-missing-args --existing --ignore-existing \
 		   -0 -aP --numeric-ids --files-from=- \
 		   -e $rsh2 --rsync-path=myrsync \
-		   "$backup_dir$dir" "dir825:/mmc$dir"
+		   "$backup_dir$subdir" "dir825:/mmc$subdir"
 
     rsync_cleanup_opts="--ignore-times"
 else
     rsync_cleanup_opts=""
 fi
 
-(cd "$backup_dir$dir"; find -type f -print0) \
+(cd "$backup_dir$subdir"; find -type f -print0) \
     | parallel --recend '\0' -0 --pipe -j1 -u --block 1M \
 	       rsync $rsync_cleanup_opts \
 	       -0 -aP --numeric-ids --files-from=- \
 	       -e $rsh2 --rsync-path=myrsync \
-	       "$backup_dir$dir" "dir825:/mmc$dir"
+	       "$backup_dir$subdir" "dir825:/mmc$subdir"
 
 cp "$tmp_dir"/started "$tmp_dir"/finished
