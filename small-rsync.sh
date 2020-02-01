@@ -2,6 +2,8 @@
 
 set -euf -o pipefail
 
+scripts=$(cd $(dirname "$0") && pwd)
+
 lock=/mnt/btrfs/.backup-inprogress
 
 if [ -f $lock ]; then
@@ -84,7 +86,7 @@ dir="/"
 
 if $cleanup; then
     $rsh2 dir825 "cd /mmc$dir; find -type d -print0" \
-	| xargs -0 -i@ ~/bin/small-rsync-filter.sh "@" \
+	| xargs -0 -i@ "$scripts/small-rsync-filter.sh" "@" \
 	| parallel --recend '\0' -0 --pipe -j1 -u --block 1M \
 		   rsync --delete --delete-missing-args --existing --ignore-existing \
 		   -0 -aP --numeric-ids --files-from=- \
