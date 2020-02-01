@@ -6,7 +6,11 @@ scripts=$(cd $(dirname "$0") && pwd)
 
 backup_dir="${1-/mnt/btrfs}"
 
-lock="$backup_dir"/.backup-inprogress
+tmp_dir="$backup_dir/.backup"
+
+mkdir -p "$tmp_dir"
+
+lock="$tmp_dir"/inprogress
 
 if [ -f $lock ]; then
     exit 0
@@ -35,14 +39,14 @@ cleanup_exit()
 
 trap cleanup_exit EXIT
 
-rsh="$backup_dir"/.rsh
+rsh="$tmp_dir"/rsh
 cat > $rsh <<'EOF'
 #!/bin/sh
 exec sudo -i -u maxim ssh -S/tmp/ssh-%u-%r@%h:%p "$@"
 EOF
 chmod +x $rsh
 
-rsh2="$backup_dir"/.rsh2
+rsh2="$tmp_dir"/rsh2
 cat > $rsh2 <<'EOF'
 #!/bin/sh
 exec sudo -i -u maxim ssh -p2222 -S/tmp/ssh-%u-%r@%h:%p "$@"
@@ -50,7 +54,7 @@ EOF
 chmod +x $rsh2
 
 cleanup=false
-if ! diff -q "$backup_dir"/.backup-started "$backup_dir"/.backup-finished; then
+if ! diff -q "$tmp_dir"/started "$tmp_dir"/finished; then
     # Delete out-of-date contents at destination if last backup didn't
     # finish cleanly.
     cleanup=true
@@ -81,7 +85,7 @@ exec rsync "$@"
 EOF
 $rsh2 dir825 chmod +x /opt/bin/myrsync
 
-date > "$backup_dir"/.backup-started
+date > "$tmp_dir"/started
 
 #dir="/home/maxim/bin/"
 dir="/"
@@ -107,4 +111,4 @@ fi
 	       -e $rsh2 --rsync-path=myrsync \
 	       "$backup_dir$dir" "dir825:/mmc$dir"
 
-cp "$backup_dir"/.backup-started "$backup_dir"/.backup-finished
+cp "$tmp_dir"/started "$tmp_dir"/finished
