@@ -16,13 +16,8 @@ tmp_dir="$backup_dir/.backup"
 
 mkdir -p "$tmp_dir"
 
-lock="$tmp_dir"/inprogress
-
-if [ -f $lock ]; then
-    exit 0
-fi
-
-touch $lock
+exec 200>"$tmp_dir"/lock
+flock -n 200 || exit 0
 
 cleanup_exit()
 {
@@ -40,7 +35,6 @@ cleanup_exit()
     sleep 5
     $rsh dir825 rmmod ext2
     $rsh -O exit dir825
-    rm -f $lock
 }
 
 trap cleanup_exit EXIT
