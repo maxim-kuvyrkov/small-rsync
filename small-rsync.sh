@@ -60,6 +60,8 @@ if ! diff -q "$tmp_dir"/started "$tmp_dir"/finished; then
     cleanup=true
 fi
 
+check_contents=false
+
 $rsh dir825 insmod ext2 || true
 $rsh dir825 mount /dev/sda1 /opt
 
@@ -75,7 +77,7 @@ directory = /opt/e2fsck
 EOF
 $rsh2 dir825 rm -rf /opt/e2fsck/
 $rsh2 dir825 mkdir /opt/e2fsck
-$rsh2 dir825 /opt/sbin/fsck.ext2 -y -C 0 /dev/sda2 || cleanup=true
+$rsh2 dir825 /opt/sbin/fsck.ext2 -y -C 0 /dev/sda2 || check_contents=true
 $rsh2 dir825 mount /dev/sda2 /mmc
 
 cat <<'EOF' | $rsh dir825 sh -c "cat > /opt/bin/myrsync"
@@ -95,10 +97,11 @@ if $cleanup; then
 		   -0 -aP --numeric-ids --files-from=- \
 		   -e $rsh2 --rsync-path=myrsync \
 		   "$backup_dir$subdir" "dir825:/mmc$subdir"
+fi
 
+rsync_cleanup_opts=""
+if $check_contents; then
     rsync_cleanup_opts="--ignore-times"
-else
-    rsync_cleanup_opts=""
 fi
 
 (cd "$backup_dir$subdir"; find -type f -print0) \
