@@ -5,6 +5,7 @@ set -euf -o pipefail
 scripts=$(cd $(dirname "$0") && pwd)
 
 backup_dir="${1-/mnt/btrfs}"
+backup_dir=$(cd "$backup_dir" && pwd)
 
 # Subdirectory relative to $backup_dir to backup.
 # Mostly for testing on a subset of filesystem.
