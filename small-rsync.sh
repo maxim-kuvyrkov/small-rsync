@@ -16,6 +16,9 @@ tmp_dir="$backup_dir/.backup"
 
 mkdir -p "$tmp_dir"
 
+exec 1>"$tmp_dir"/log 2>&1
+set -x
+
 exec 200>"$tmp_dir"/lock
 flock -n 200 || exit 0
 
