@@ -99,7 +99,7 @@ if $cleanup; then
 		   rsync --delete --delete-missing-args --existing --ignore-existing \
 		   -0 -aP --numeric-ids --files-from=- \
 		   -e $rsh2 --rsync-path=myrsync \
-		   "$backup_dir$subdir" "dir825:/mmc$subdir"
+		   "$backup_dir$subdir" "dir825:/mmc$subdir" || true
 fi
 
 rsync_cleanup_opts=""
