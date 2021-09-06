@@ -93,10 +93,17 @@ $rsh2 dir825 chmod +x /opt/bin/myrsync
 date > "$tmp_dir"/started
 
 if $cleanup; then
+    # --delete-missing-args deletes remote directories, which don't exist
+    # locally.
+    # --existing delays transfer of new files till the main sync below.
+    # --ignore-existing delays update of files till the main sync below.
+    # --recursive enables recursive processing, which is removed from
+    # "-a" by --files-from=
     $rsh2 dir825 "cd /mmc$subdir; find -type d -print0" \
 	| xargs -0 -i@ "$scripts/small-rsync-filter.sh" "@" \
 	| parallel --recend '\0' -0 --pipe -j1 -u --block 1M \
-		   rsync --delete --delete-missing-args --existing --ignore-existing \
+		   rsync --delete --delete-missing-args --existing \
+		   --ignore-existing --recursive \
 		   -0 -aP --numeric-ids --files-from=- \
 		   -e $rsh2 --rsync-path=myrsync \
 		   "$backup_dir$subdir" "dir825:/mmc$subdir" || true
