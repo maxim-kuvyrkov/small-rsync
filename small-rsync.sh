@@ -114,7 +114,8 @@ if $cleanup; then
 		       --ignore-existing \
 		       -0 -aP --numeric-ids --files-from=- \
 		       -e $rsh2 --rsync-path=myrsync \
-		       "$backup_dir$subdir" "dir825:/mmc$subdir" || true
+		       "$backup_dir${subdirs[$subdir]}" "dir825:/mmc$subdir" \
+	    || true
     done
 fi
 
@@ -124,12 +125,12 @@ if $check_contents; then
 fi
 
 for subdir in "${!subdirs[@]}"; do
-    (cd "$backup_dir$subdir"; find -type f -print0) \
+    (cd "$backup_dir${subdirs[$subdir]}"; find -type f -print0) \
 	| parallel --recend '\0' -0 --pipe -j1 -u --block 1M \
 		   rsync $rsync_cleanup_opts \
 		   -0 -aP --numeric-ids --files-from=- \
 		   -e $rsh2 --rsync-path=myrsync \
-		   "$backup_dir$subdir" "dir825:/mmc$subdir"
+		   "$backup_dir${subdirs[$subdir]}" "dir825:/mmc$subdir"
 done
 
 cp "$tmp_dir"/started "$tmp_dir"/finished
