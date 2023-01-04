@@ -86,6 +86,7 @@ $rsh2 dir825 chmod +x /opt/bin/myrsync
 date > "$tmp_dir"/started
 
 declare -A done_subdirs
+clean_run=true
 
 # Walk through snapshots named "@<subdir>.<date>T<time>" starting with
 # the oldest snapshots first.  Rsync the oldest snapshot to dir825.
@@ -140,7 +141,12 @@ while true; do
 		       -e $rsh2 --rsync-path=myrsync \
 		       ./ "dir825:/mmc/$subdir/"
     ) &
-    wait $! || true
+
+    if ! wait $!; then
+	clean_run=false
+    fi
 done
 
-cp "$tmp_dir"/started "$tmp_dir"/finished
+if $clean_run; then
+    cp "$tmp_dir"/started "$tmp_dir"/finished
+fi
