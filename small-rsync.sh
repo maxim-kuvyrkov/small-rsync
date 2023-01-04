@@ -5,23 +5,6 @@ set -euf -o pipefail
 backup_dir="${1-/mnt/btrfs/snapshots}"
 backup_dir=$(cd "$backup_dir" && pwd)
 
-declare -A subdirs
-for i in $(cd "$backup_dir"; set +f; ls -t); do
-    subdir=$(echo "$i" | sed -e "s/^@\([^\.]*\)\..*/\1/")
-    if [ x"$i" = x"$subdir" ]; then
-	continue
-    fi
-    subdirs[/$subdir/]="/$i/"
-done
-
-for subdir in "${!subdirs[@]}"; do
-    echo "$subdir : ${subdirs[$subdir]}"
-done
-
-# Subdirectory relative to $backup_dir to backup.
-# Mostly for testing on a subset of filesystem.
-#subdirs[/home/maxim/bin/]="/@home.DATE/maxim/bin/"
-
 tmp_dir="$backup_dir/.backup"
 
 mkdir -p "$tmp_dir"
@@ -102,35 +85,62 @@ $rsh2 dir825 chmod +x /opt/bin/myrsync
 
 date > "$tmp_dir"/started
 
-if $cleanup; then
-    # --delete-missing-args deletes remote directories, which don't exist
-    # locally.
-    # --existing delays transfer of new files till the main sync below.
-    # --ignore-existing delays update of files till the main sync below.
-    for subdir in "${!subdirs[@]}"; do
-	$rsh2 dir825 "cd /mmc$subdir; find -print0" \
+declare -A done_subdirs
+
+# Walk through snapshots named "@<subdir>.<date>T<time>" starting with
+# the oldest snapshots first.  Rsync the oldest snapshot to dir825.
+while true; do
+    subdir=""
+    for i in $(cd "$backup_dir"; find . -maxdepth 1 -type d ! -path . \
+		   | sed -e "s#^\./##" | sort -t. -k2); do
+	src_subdir="$i"
+	i=$(echo "$i" | sed -e "s/^@\([^\.]*\)\..*/\1/")
+
+	if [ x"${done_subdirs[$i]-}" = x"1" ]; then
+	    continue
+	fi
+	subdir="$i"
+	break
+    done
+
+    if [ x"$subdir" = x"" ]; then
+	# No unprocessed subdirs left.
+	break
+    fi
+
+    done_subdirs[$subdir]=1
+
+    (
+	cd "$backup_dir/$src_subdir"
+
+	# --delete-missing-args deletes remote directories, which do not exist
+	# locally.
+	# --existing delays transfer of new files till the main sync below.
+	# --ignore-existing delays update of files till the main sync below.
+	if $cleanup; then
+	    $rsh2 dir825 "cd /mmc/$subdir; find -print0" \
+		| parallel --recend '\0' -0 --pipe -j1 -u --block 1M \
+			   rsync --delete --delete-missing-args --existing \
+			   --ignore-existing \
+			   -0 -aP --numeric-ids --files-from=- \
+			   -e $rsh2 --rsync-path=myrsync \
+			   ./ "dir825:/mmc/$subdir/" \
+		|| true
+	fi
+
+	rsync_cleanup_opts=""
+	if $check_contents; then
+	    rsync_cleanup_opts="--ignore-times"
+	fi
+
+	find -type f -print0 \
 	    | parallel --recend '\0' -0 --pipe -j1 -u --block 1M \
-		       rsync --delete --delete-missing-args --existing \
-		       --ignore-existing \
+		       rsync $rsync_cleanup_opts \
 		       -0 -aP --numeric-ids --files-from=- \
 		       -e $rsh2 --rsync-path=myrsync \
-		       "$backup_dir${subdirs[$subdir]}" "dir825:/mmc$subdir" \
-	    || true
-    done
-fi
-
-rsync_cleanup_opts=""
-if $check_contents; then
-    rsync_cleanup_opts="--ignore-times"
-fi
-
-for subdir in "${!subdirs[@]}"; do
-    (cd "$backup_dir${subdirs[$subdir]}"; find -type f -print0) \
-	| parallel --recend '\0' -0 --pipe -j1 -u --block 1M \
-		   rsync $rsync_cleanup_opts \
-		   -0 -aP --numeric-ids --files-from=- \
-		   -e $rsh2 --rsync-path=myrsync \
-		   "$backup_dir${subdirs[$subdir]}" "dir825:/mmc$subdir"
+		       ./ "dir825:/mmc/$subdir/"
+    ) &
+    wait $! || true
 done
 
 cp "$tmp_dir"/started "$tmp_dir"/finished
