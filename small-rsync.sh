@@ -78,7 +78,7 @@ fi
 # --ignore-existing delays update of files till the main sync below.
 rsync $cleanup_opts \
     --delete --existing --ignore-existing \
-    -aP --numeric-ids \
+    -azP --numeric-ids \
     ".$subdir" "$remote:$remote_dir$subdir" > cleanup.log || true
 
 check_opts=""
@@ -87,7 +87,7 @@ if $check_contents; then
 fi
 
 rsync $check_opts \
-      -aP --numeric-ids \
+      -azP --numeric-ids \
       ".$subdir" "$remote:$remote_dir$subdir"
 
 cp "$tmp_dir"/started "$tmp_dir"/finished
