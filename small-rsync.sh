@@ -32,20 +32,10 @@ cleanup_exit()
 	btrfs subvolume delete "$tmp_dir/$i"
     done
 
-    $rcmd umount $remote_dir
-    $rcmd -O exit
+    ssh $remote umount $remote_dir
 }
 
 trap cleanup_exit EXIT
-
-rsh="$tmp_dir"/rsh
-cat > $rsh <<'EOF'
-#!/bin/sh
-exec sudo -i -u maxim ssh -S/tmp/ssh-%u-%r@%h:%p "$@"
-EOF
-chmod +x $rsh
-
-rcmd="$rsh $remote"
 
 cleanup=false
 if ! diff -q "$tmp_dir"/started "$tmp_dir"/finished; then
@@ -56,7 +46,7 @@ fi
 
 check_contents=false
 
-$rcmd mount $remote_dir
+ssh $remote mount $remote_dir
 
 date > "$tmp_dir"/started
 
@@ -88,7 +78,7 @@ fi
 # --ignore-existing delays update of files till the main sync below.
 rsync $cleanup_opts \
     --delete --existing --ignore-existing \
-    -aP --numeric-ids -e $rsh \
+    -aP --numeric-ids \
     ".$subdir" "$remote:$remote_dir$subdir" > cleanup.log || true
 
 check_opts=""
@@ -97,7 +87,7 @@ if $check_contents; then
 fi
 
 rsync $check_opts \
-      -aP --numeric-ids -e $rsh \
+      -aP --numeric-ids \
       ".$subdir" "$remote:$remote_dir$subdir"
 
 cp "$tmp_dir"/started "$tmp_dir"/finished
